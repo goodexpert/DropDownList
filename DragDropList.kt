@@ -1,5 +1,5 @@
 @Composable
-fun ReorderableList(
+fun DragDropList(
     items: List<ReorderItem>,
     onMove: (Int, Int) -> Unit,
     modifier: Modifier = Modifier

@@ -3,7 +3,7 @@ fun rememberDragDropListState(
     lazyListState: LazyListState = rememberLazyListState(),
     onMove: (Int, Int) -> Unit,
 ): ReorderableListState {
-    return remember { ReorderableListState(lazyListState = lazyListState, onMove = onMove) }
+    return remember { DragDropListState(lazyListState = lazyListState, onMove = onMove) }
 }
 
 class DragDropListState(
