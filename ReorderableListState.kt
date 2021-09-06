@@ -1,12 +1,12 @@
 @Composable
-fun rememberReorderableListState(
+fun rememberDragDropListState(
     lazyListState: LazyListState = rememberLazyListState(),
     onMove: (Int, Int) -> Unit,
 ): ReorderableListState {
     return remember { ReorderableListState(lazyListState = lazyListState, onMove = onMove) }
 }
 
-class ReorderableListState(
+class DragDropListState(
     val lazyListState: LazyListState,
     private val onMove: (Int, Int) -> Unit
 ) {

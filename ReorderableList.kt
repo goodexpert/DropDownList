@@ -9,7 +9,7 @@ fun ReorderableList(
 
     var overscrollJob by remember { mutableStateOf<Job?>(null) }
 
-    val reorderableListState = rememberReorderableListState(onMove = onMove)
+    val dragDropListState = rememberDragDropListState(onMove = onMove)
 
     LazyColumn(
         modifier = modifier
@@ -17,30 +17,30 @@ fun ReorderableList(
                 detectDragGesturesAfterLongPress(
                     onDrag = { change, offset ->
                         change.consumeAllChanges()
-                        reorderableListState.onDrag(offset)
+                        dragDropListState.onDrag(offset)
 
                         if (overscrollJob?.isActive == true)
                             return@detectDragGesturesAfterLongPress
 
-                        reorderableListState.checkForOverScroll()
+                        dragDropListState.checkForOverScroll()
                             .takeIf { it != 0f }
-                            ?.let { overscrollJob = scope.launch { reorderableListState.lazyListState.scrollBy(it) } }
+                            ?.let { overscrollJob = scope.launch { dragDropListState.lazyListState.scrollBy(it) } }
                             ?: run { overscrollJob?.cancel() }
                     },
-                    onDragStart = { offset -> reorderableListState.onDragStart(offset) },
-                    onDragEnd = { reorderableListState.onDragInterrupted() },
-                    onDragCancel = { reorderableListState.onDragInterrupted() }
+                    onDragStart = { offset -> dragDropListState.onDragStart(offset) },
+                    onDragEnd = { dragDropListState.onDragInterrupted() },
+                    onDragCancel = { dragDropListState.onDragInterrupted() }
                 )
             },
-        state = reorderableListState.lazyListState
+        state = dragDropListState.lazyListState
     ) {
         itemsIndexed(items) { index, item ->
             Column(
                 modifier = Modifier
                     .composed {
                         val offsetOrNull =
-                            reorderableListState.elementDisplacement.takeIf { 
-                              index == reorderableListState.currentIndexOfDraggedItem 
+                            dragDropListState.elementDisplacement.takeIf { 
+                              index == dragDropListState.currentIndexOfDraggedItem 
                             }
 
                         Modifier
