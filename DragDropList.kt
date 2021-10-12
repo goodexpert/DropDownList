@@ -1,56 +1,38 @@
 @Composable
-fun DragDropList(
-    items: List<ReorderItem>,
+fun <T : Any > DragDropList(
     onMove: (Int, Int) -> Unit,
-    modifier: Modifier = Modifier
+    items: List<T>,
+    modifier: Modifier = Modifier,
+    contentColor: Color = Color.Unspecified,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    content: @Composable (T) -> Unit
 ) {
-
-    val scope = rememberCoroutineScope()
-
-    var overscrollJob by remember { mutableStateOf<Job?>(null) }
-
     val dragDropListState = rememberDragDropListState(onMove = onMove)
 
     LazyColumn(
         modifier = modifier
-            .pointerInput(Unit) {
-                detectDragGesturesAfterLongPress(
-                    onDrag = { change, offset ->
-                        change.consumeAllChanges()
-                        dragDropListState.onDrag(offset)
-
-                        if (overscrollJob?.isActive == true)
-                            return@detectDragGesturesAfterLongPress
-
-                        dragDropListState.checkForOverScroll()
-                            .takeIf { it != 0f }
-                            ?.let { overscrollJob = scope.launch { dragDropListState.lazyListState.scrollBy(it) } }
-                            ?: run { overscrollJob?.cancel() }
-                    },
-                    onDragStart = { offset -> dragDropListState.onDragStart(offset) },
-                    onDragEnd = { dragDropListState.onDragInterrupted() },
-                    onDragCancel = { dragDropListState.onDragInterrupted() }
-                )
+            .composed {
+                dragDropListState.modifier
             },
-        state = dragDropListState.lazyListState
+        state = dragDropListState.lazyListState,
+        contentPadding = contentPadding
     ) {
         itemsIndexed(items) { index, item ->
-            Column(
+            Surface(
                 modifier = Modifier
                     .composed {
-                        val offsetOrNull =
-                            dragDropListState.elementDisplacement.takeIf { 
-                              index == dragDropListState.currentIndexOfDraggedItem 
-                            }
+                        val offsetOrNull = dragDropListState.getOffsetBy(index)
 
                         Modifier
                            .graphicsLayer {
                                translationY = offsetOrNull ?: 0f
                            }
                     }
-                    .background(Color.White, shape = RoundedCornerShape(4.dp))
-                    .fillMaxWidth()
-            ) { Text(text = "Item ${item.id}") }
+                    .wrapContentSize(),
+                shape = RoundedCornerShape(4.dp)
+                color = contentColor,
+                content = { content(item) }
+            )
         }
     }
 }

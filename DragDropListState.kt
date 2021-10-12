@@ -6,56 +6,78 @@ fun rememberDragDropListState(
     return remember { DragDropListState(lazyListState = lazyListState, onMove = onMove) }
 }
 
+@Stable
 class DragDropListState(
     val lazyListState: LazyListState,
     private val onMove: (Int, Int) -> Unit
 ) {
-    var draggedDistance by mutableStateOf(0f)
+    private var draggedDistance by mutableStateOf(0f)
 
     // used to obtain initial offsets on drag start
-    var initiallyDraggedElement by mutableStateOf<LazyListItemInfo?>(null)
+    private var draggedItemInfo by mutableStateOf<LazyListItemInfo?>(null)
 
-    var currentIndexOfDraggedItem by mutableStateOf<Int?>(null)
+    private var currentIndexOfDraggedItem by mutableStateOf<Int?>(null)
 
-    val initialOffsets: Pair<Int, Int>?
-        get() = initiallyDraggedElement?.let { Pair(it.offset, it.offsetEnd) }
+    private val initialOffsets: Pair<Int, Int>?
+        get() = draggedItemInfo?.let { Pair(it.offset, it.offsetEnd) }
 
-    val elementDisplacement: Float?
+    private val elementDisplacement: Float?
         get() = currentIndexOfDraggedItem
             ?.let { lazyListState.getVisibleItemInfoFor(absoluteIndex = it) }
-            ?.let { item -> (initiallyDraggedElement?.offset ?: 0f).toFloat() + draggedDistance - item.offset }
+            ?.let { item -> (draggedItemInfo?.offset ?: 0f).toFloat() + draggedDistance - item.offset }
 
-    val currentElement: LazyListItemInfo?
+    private val currentItemInfo: LazyListItemInfo?
         get() = currentIndexOfDraggedItem?.let {
             lazyListState.getVisibleItemInfoFor(absoluteIndex = it)
         }
 
-    var overscrollJob by mutableStateOf<Job?>(null)
+    private var overscrollJob by mutableStateOf<Job?>(null)
 
-    fun onDragStart(offset: Offset) {
+    val modifier:Modifier = Modifier
+        .pointerInput(kotlin.Unit) {
+            detectDragGesturesAfterLongPress(
+                onDrag = { change, offset ->
+                    change.consumeAllChanges()
+                    onDrag(offset)
+
+                    if (overscrollJob?.isActive == true)
+                        return@detectDragGesturesAfterLongPress
+
+                    checkForOverScroll()
+                        .takeIf { it != 0f }
+                        ?.let { overscrollJob = CoroutineScope(Dispatchers.IO).launch { lazyListState.scrollBy(it) } }
+                        ?: run { overscrollJob?.cancel() }
+                },
+                onDragStart = { offset -> onDragStart(offset) },
+                onDragEnd = { onDragInterrupted() },
+                onDragCancel = { onDragInterrupted() }
+            )
+        }
+
+    private fun onDragStart(offset: Offset) {
         lazyListState.layoutInfo.visibleItemsInfo
             .firstOrNull { item -> offset.y.toInt() in item.offset..(item.offset + item.size) }
             ?.also {
                 currentIndexOfDraggedItem = it.index
-                initiallyDraggedElement = it
+                draggedItemInfo = it
             }
     }
 
-    fun onDragInterrupted() {
+    private fun onDragInterrupted() {
         draggedDistance = 0f
         currentIndexOfDraggedItem = null
-        initiallyDraggedElement = null
+        draggedItemInfo = null
         overscrollJob?.cancel()
     }
 
-    fun onDrag(offset: Offset) {
+    private fun onDrag(offset: Offset) {
         draggedDistance += offset.y
 
         initialOffsets?.let { (topOffset, bottomOffset) ->
             val startOffset = topOffset + draggedDistance
             val endOffset = bottomOffset + draggedDistance
 
-            currentElement?.let { hovered ->
+            currentItemInfo?.let { hovered ->
                 lazyListState.layoutInfo.visibleItemsInfo
                     .filterNot { item -> item.offsetEnd < startOffset || item.offset > endOffset || hovered.index == item.index }
                     .firstOrNull { item ->
@@ -73,8 +95,8 @@ class DragDropListState(
         }
     }
 
-    fun checkForOverScroll(): Float {
-        return initiallyDraggedElement?.let {
+    private fun checkForOverScroll(): Float {
+        return draggedItemInfo?.let {
             val startOffset = it.offset + draggedDistance
             val endOffset = it.offsetEnd + draggedDistance
 
@@ -84,5 +106,9 @@ class DragDropListState(
                 else -> null
             }
         } ?: 0f
+    }
+
+    fun getOffsetBy(index: Int): Float? {
+        return elementDisplacement.takeIf { index == currentIndexOfDraggedItem }
     }
 }
